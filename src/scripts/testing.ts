@@ -1,4 +1,4 @@
-import {getServers} from './get-servers'
+import {getServers} from './utils/get-servers'
 import { NS } from './bitburner';
 
 export async function main(ns: NS) {

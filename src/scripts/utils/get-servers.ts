@@ -1,4 +1,4 @@
-import { NS } from "./bitburner"
+import { NS } from "../bitburner"
 
  export const getServers = (ns: NS, requireRoot: boolean) => {
 	let toReturn: string[] = []

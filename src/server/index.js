@@ -13,8 +13,7 @@ app.get('/manifest.txt', (req, res) => {
     glob("**/*.js", {cwd: 'out'}, (_, matches) => {
         let fileRes = ""
         for (var file of matches) {
-            if (file == 'sync.js') continue
-            fileRes += `${file}\n`
+            fileRes += `/${file}\n`
         }
         res.send(fileRes)
     })
@@ -30,7 +29,7 @@ app.get('**/*.js', (req, res) => {
         // We want to do a replacement so bitburner can import
         const regex = /(import.*from\s{1})\'\.\/(.*)'\;/g;
         let resStr = data.toString()
-        var newRes = resStr.replaceAll(regex, "$1'$2.js';")
+        var newRes = resStr.replaceAll(regex, "$1'\/$2.js';")
 
         res.send(newRes)
     })
