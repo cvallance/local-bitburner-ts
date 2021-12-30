@@ -3,7 +3,8 @@ import { NS } from './bitburner';
 
 export async function main(ns: NS) {
 	let servers = getServers(ns, false)
+	ns.tprint(`Test script printing all available hosts:`)
 	for (var hostName of servers) {
-		ns.tprint(`Test script print host: ${hostName}`)
+		ns.tprint(`  -> ${hostName}`)
 	}
 }
