@@ -1,4 +1,4 @@
-import { NS } from "bitburner";
+import { NS } from 'bitburner'
 
 export async function main(ns: NS) {
     const target = ns.args[0] as string

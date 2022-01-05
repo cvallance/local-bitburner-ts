@@ -1,4 +1,4 @@
-import { NS } from "bitburner"
+import { NS } from 'bitburner'
 
 interface Column {
     label: string
@@ -6,7 +6,13 @@ interface Column {
     formatter: (value: any) => string
 }
 
-type Format = 'string' | 'time' | 'ram' | 'money' | 'percentage' | Column['formatter']
+type Format =
+    | 'string'
+    | 'time'
+    | 'ram'
+    | 'money'
+    | 'percentage'
+    | Column['formatter']
 
 export const fram = (ns: NS, ram: number) => {
     return ns.nFormat(ram * 1024 ** 3, '0ib').toString()
@@ -27,19 +33,23 @@ function generateFormatter(ns: NS, format: Format): Column['formatter'] {
     }
     switch (format) {
         case 'string':
-            return f => '' + f
+            return (f) => '' + f
         case 'ram':
-            return f => fram(ns, f)
+            return (f) => fram(ns, f)
         case 'money':
-            return f => ns.nFormat(f, '$0.00a').toString()
+            return (f) => ns.nFormat(f, '$0.00a').toString()
         case 'percentage':
-            return f => (f * 100).toFixed(2) + '%'
+            return (f) => (f * 100).toFixed(2) + '%'
         case 'time':
-            return f => ns.tFormat(f)
+            return (f) => ns.tFormat(f)
     }
 }
 
-function alignTruncate(value: string, width: number, align: Column['align']): string {
+function alignTruncate(
+    value: string,
+    width: number,
+    align: Column['align']
+): string {
     if (value.length > width) {
         return value.substring(0, width)
     }
@@ -71,7 +81,7 @@ export class Table {
             format: 'string',
             ...opts,
         }
-        const {align, format} = fullOpts
+        const { align, format } = fullOpts
 
         this.columns.push({
             label,
@@ -88,7 +98,7 @@ export class Table {
     }
 
     private getWidths(): number[] {
-        let widths = this.columns.map(c => c.label.length)
+        let widths = this.columns.map((c) => c.label.length)
         for (const index in this.columns) {
             const column = this.columns[index]
             for (const row of this.rows) {
@@ -117,7 +127,9 @@ export class Table {
     public render(): string {
         const widths = this.getWidths()
         const columnJoin = ' | '
-        const totalWidth = widths.reduce((t, w) => t + w, 0) + columnJoin.length * (widths.length - 1)
+        const totalWidth =
+            widths.reduce((t, w) => t + w, 0) +
+            columnJoin.length * (widths.length - 1)
         this.doAlignment()
 
         let out = ''
@@ -126,12 +138,22 @@ export class Table {
         }
         out += '-'.repeat(totalWidth) + '\n'
         out +=
-            this.columns.map((c, i) => alignTruncate(c.label, widths[i], this.columns[i].align)).join(columnJoin) + '\n'
+            this.columns
+                .map((c, i) =>
+                    alignTruncate(c.label, widths[i], this.columns[i].align)
+                )
+                .join(columnJoin) + '\n'
         out += '-'.repeat(totalWidth) + '\n'
         for (const row of this.rows) {
             out +=
                 row
-                    .map((c, i) => alignTruncate(this.columns[i].formatter(c), widths[i], this.columns[i].align))
+                    .map((c, i) =>
+                        alignTruncate(
+                            this.columns[i].formatter(c),
+                            widths[i],
+                            this.columns[i].align
+                        )
+                    )
                     .join(columnJoin) + '\n'
         }
         out += '-'.repeat(totalWidth) + '\n'
