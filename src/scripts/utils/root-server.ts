@@ -9,16 +9,11 @@ const tryRunHost = (ns: NS, func: (target: string) => void, target: string) => {
 }
 
 export const rootServer = async (ns: NS, target: string) => {
-    if (ns.fileExists('BruteSSH.exe', 'home'))
-        tryRunHost(ns, ns.brutessh, target)
-    if (ns.fileExists('FTPCrack.exe', 'home'))
-        tryRunHost(ns, ns.ftpcrack, target)
-    if (ns.fileExists('relaySMTP.exe', 'home'))
-        tryRunHost(ns, ns.relaysmtp, target)
-    if (ns.fileExists('HTTPWorm.exe', 'home'))
-        tryRunHost(ns, ns.httpworm, target)
-    if (ns.fileExists('SQLInject.exe', 'home'))
-        tryRunHost(ns, ns.sqlinject, target)
+    if (ns.fileExists('BruteSSH.exe', 'home')) tryRunHost(ns, ns.brutessh, target)
+    if (ns.fileExists('FTPCrack.exe', 'home')) tryRunHost(ns, ns.ftpcrack, target)
+    if (ns.fileExists('relaySMTP.exe', 'home')) tryRunHost(ns, ns.relaysmtp, target)
+    if (ns.fileExists('HTTPWorm.exe', 'home')) tryRunHost(ns, ns.httpworm, target)
+    if (ns.fileExists('SQLInject.exe', 'home')) tryRunHost(ns, ns.sqlinject, target)
 
     if (!ns.hasRootAccess(target)) {
         try {

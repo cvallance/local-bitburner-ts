@@ -6,13 +6,7 @@ interface Column {
     formatter: (value: any) => string
 }
 
-type Format =
-    | 'string'
-    | 'time'
-    | 'ram'
-    | 'money'
-    | 'percentage'
-    | Column['formatter']
+type Format = 'string' | 'time' | 'ram' | 'money' | 'percentage' | Column['formatter']
 
 export const fram = (ns: NS, ram: number) => {
     return ns.nFormat(ram * 1024 ** 3, '0ib').toString()
@@ -45,11 +39,7 @@ function generateFormatter(ns: NS, format: Format): Column['formatter'] {
     }
 }
 
-function alignTruncate(
-    value: string,
-    width: number,
-    align: Column['align']
-): string {
+function alignTruncate(value: string, width: number, align: Column['align']): string {
     if (value.length > width) {
         return value.substring(0, width)
     }
@@ -127,9 +117,7 @@ export class Table {
     public render(): string {
         const widths = this.getWidths()
         const columnJoin = ' | '
-        const totalWidth =
-            widths.reduce((t, w) => t + w, 0) +
-            columnJoin.length * (widths.length - 1)
+        const totalWidth = widths.reduce((t, w) => t + w, 0) + columnJoin.length * (widths.length - 1)
         this.doAlignment()
 
         let out = ''
@@ -137,24 +125,10 @@ export class Table {
             out += this.title + '\n'
         }
         out += '-'.repeat(totalWidth) + '\n'
-        out +=
-            this.columns
-                .map((c, i) =>
-                    alignTruncate(c.label, widths[i], this.columns[i].align)
-                )
-                .join(columnJoin) + '\n'
+        out += this.columns.map((c, i) => alignTruncate(c.label, widths[i], this.columns[i].align)).join(columnJoin) + '\n'
         out += '-'.repeat(totalWidth) + '\n'
         for (const row of this.rows) {
-            out +=
-                row
-                    .map((c, i) =>
-                        alignTruncate(
-                            this.columns[i].formatter(c),
-                            widths[i],
-                            this.columns[i].align
-                        )
-                    )
-                    .join(columnJoin) + '\n'
+            out += row.map((c, i) => alignTruncate(this.columns[i].formatter(c), widths[i], this.columns[i].align)).join(columnJoin) + '\n'
         }
         out += '-'.repeat(totalWidth) + '\n'
 

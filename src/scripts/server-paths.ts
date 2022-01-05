@@ -7,12 +7,7 @@ export async function main(ns: NS) {
     if (ns.args.length) {
         const filter = ns.args[0] as string
         if (filter == 'factions') {
-            servers = servers.filter(
-                (x) =>
-                    x.Server.moneyMax == 0 &&
-                    !x.Server.purchasedByPlayer &&
-                    x.Server.hostname != 'darkweb'
-            )
+            servers = servers.filter((x) => x.Server.moneyMax == 0 && !x.Server.purchasedByPlayer && x.Server.hostname != 'darkweb')
         } else {
             // Simple text match
             servers = servers.filter((x) => x.Server.hostname.includes(filter))

@@ -43,23 +43,17 @@ export async function main(ns: NS) {
     }
 
     const allServers = getServers(ns)
-    const hackableServers = allServers.filter(
-        (s) => s.hasAdminRights && s.moneyMax
-    )
+    const hackableServers = allServers.filter((s) => s.hasAdminRights && s.moneyMax)
     for (const server of hackableServers) {
         if (server.requiredHackingSkill > hacking + 200) {
             continue
         }
         table.addRow(
             server.hostname,
-            `${(server.hackDifficulty - server.minDifficulty).toFixed(2)}+${
-                server.minDifficulty
-            }`,
+            `${(server.hackDifficulty - server.minDifficulty).toFixed(2)}+${server.minDifficulty}`,
             server.moneyAvailable,
             server.moneyAvailable / server.moneyMax,
-            `${byServer[server.hostname]?.weaken || 0} . ${
-                byServer[server.hostname]?.grow || 0
-            } . ${byServer[server.hostname]?.hack || 0}`,
+            `${byServer[server.hostname]?.weaken || 0} . ${byServer[server.hostname]?.grow || 0} . ${byServer[server.hostname]?.hack || 0}`,
             server.requiredHackingSkill,
             ns.getHackTime(server.hostname)
         )
@@ -71,10 +65,5 @@ export async function main(ns: NS) {
     const serversCanRun = allServers.filter((s) => s.hasAdminRights && s.maxRam)
     const maxRam = serversCanRun.reduce((r, s) => r + s.maxRam, 0)
     const usedRam = serversCanRun.reduce((r, s) => r + s.ramUsed, 0)
-    ns.tprintf(
-        'Used %s of %s %0.2f%%',
-        fram(ns, usedRam),
-        fram(ns, maxRam),
-        (usedRam / maxRam) * 100
-    )
+    ns.tprintf('Used %s of %s %0.2f%%', fram(ns, usedRam), fram(ns, maxRam), (usedRam / maxRam) * 100)
 }
