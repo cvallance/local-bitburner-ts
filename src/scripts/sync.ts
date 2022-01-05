@@ -1,4 +1,4 @@
-import { NS } from "./bitburner"
+import { NS } from "bitburner"
 
 async function fetchScript(ns: NS, filename: string) {
     const oldContent = ns.read(filename)

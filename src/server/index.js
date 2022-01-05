@@ -27,7 +27,7 @@ app.get('**/*.js', (req, res) => {
         }
 
         // We want to do a replacement so bitburner can import
-        const regex = /(import.*from\s{1})\'\.\/(.*)'\;/g;
+        const regex = /(import.*from\s{1})[\'\"]\.\/(.*)[\'\"]\;/g;
         let resStr = data.toString()
         var newRes = resStr.replaceAll(regex, "$1'\/$2.js';")
 
