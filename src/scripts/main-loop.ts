@@ -1,12 +1,12 @@
-import { NS, Server } from './bitburner'
+import { NS, Player, Server } from './bitburner'
 import { getProcesses, getServers } from './utils/get-servers'
 import { purchaseServer } from './utils/purchase-server'
 import { rootServer } from './utils/root-server'
 
-const purchaseServerRam = 16384
+const purchaseServerRam = 1048576
 const homeRamReservation = 32
 
-const rootServers = async (ns: NS, servers: Server[]) => {
+const rootServers = async (ns: NS) => {
     for (const serverInfo of servers) {
         const hostname = serverInfo.hostname
         await rootServer(ns, hostname)
@@ -39,10 +39,10 @@ const remoteExec = (ns: NS, freeServers: FreeServer[], script: string, threads: 
     }
 }
 
-const weakenThreadMaths = (ns: NS, homeServer: Server, amountToWeaken: number, maxThreads: number): ThreadCounts => {
+const weakenThreadMaths = (ns: NS, homeServer: Server, amountToWeaken: number, maxThreads?: number): ThreadCounts => {
     // const weakenAmount = ns.weakenAnalyze(1, homeServer.cpuCores)
     const weakenAmount = 0.05
-    let weakenThreads = Math.ceil(amountToWeaken / weakenAmount)
+    let weakenThreads = Math.min(Math.ceil(amountToWeaken / weakenAmount), maxThreads || Number.MAX_VALUE)
     return {
         weaken: weakenThreads,
         grow: 0,
@@ -73,9 +73,8 @@ const growThreadMaths = (
     if (currMoney == 0) return mathsOffMaxThreads()
 
     const desiredGrowMulti = maxMoney / currMoney
-    // const wantedGrow = Math.ceil(ns.growthAnalyze(serverToHack.hostname, desiredGrowMulti, homeServer.cpuCores)) || 1
+    // const wantedGrow = Math.ceil(ns.growthAnalyze(serverToHack.hostname, desiredGrowMulti, homeServer.cpuCores))
     const wantedGrow = Math.ceil(ns.growthAnalyze(serverToHack.hostname, desiredGrowMulti + 0.1, 1))
-    // const wantedGrow = 50000
     // For every 12 grows we need 1 weaken
     const wantedWeaken = Math.ceil(wantedGrow / 12)
 
@@ -88,16 +87,15 @@ const hackThreadMaths = (ns: NS, homeServer: Server, serverToHack: Server, maxTh
     if (maxThreads < 22) return { weaken: 0, grow: 0, hack: maxThreads }
 
     const hackPercent = ns.hackAnalyze(serverToHack.hostname)
-    // const hackPercent = 0.01
     const wantedHackThreads = Math.ceil(0.2 / hackPercent)
     const totalHacks = wantedHackThreads * 3
     // const wantedGrowThreads = ns.growthAnalyze(serverToHack.hostname, 1, homeServer.cpuCores)
     const wantedGrowThreads = ns.growthAnalyze(serverToHack.hostname, 2.1, 1)
-    // const wantedGrowThreads = 50000
 
     const secUp = totalHacks * 0.002 + wantedGrowThreads * 0.004
-    const wantedWeakenThreads = weakenThreadMaths(ns, homeServer, secUp, maxThreads).weaken
-    if (wantedHackThreads + wantedGrowThreads + wantedWeakenThreads <= maxThreads) {
+    const wantedWeakenThreads = weakenThreadMaths(ns, homeServer, secUp).weaken
+    const totalWantedThreads = wantedHackThreads + wantedGrowThreads + wantedWeakenThreads
+    if (totalWantedThreads <= maxThreads) {
         return {
             weaken: wantedWeakenThreads,
             grow: wantedGrowThreads,
@@ -105,25 +103,20 @@ const hackThreadMaths = (ns: NS, homeServer: Server, serverToHack: Server, maxTh
         }
     }
 
-    // Just have to do maths based off maxThreads
-    // TODO: Figure out the ratio of hacks to growths
-    // for every 25 total hacks we need 1 weaken ... if we run hack 3 times we should have 8 threads to 1 weaken
-    // for every 12 growths we need 1 weaken
-    const ratio = Math.floor(maxThreads / 22)
+    // Just have to do maths based off maxThreads and just use the above ratios to figure out numbers
     return {
-        weaken: ratio * 2,
-        grow: ratio * 12,
-        hack: ratio * 8,
+        weaken: Math.ceil(maxThreads * (totalWantedThreads / wantedWeakenThreads)),
+        grow: Math.floor(maxThreads * (totalWantedThreads / wantedGrowThreads)),
+        hack: Math.floor(maxThreads * (totalWantedThreads / wantedHackThreads)),
     }
 }
 
-const hackGrowWeaken = async (ns: NS, servers: Server[]) => {
-    const hackLvl = ns.getPlayer().hacking
-    const allServers = getServers(ns)
-    const homeServer = allServers.find((x) => x.hostname == 'home')!
+const hackGrowWeaken = async (ns: NS) => {
+    const hackLvl = player.hacking
+    const homeServer = servers.find((x) => x.hostname == 'home')!
 
     // Can run scripts
-    const serversCanRun = allServers.filter((s) => s.hasAdminRights && s.maxRam)
+    const serversCanRun = servers.filter((s) => s.hasAdminRights && s.maxRam)
     const ramCost = Math.max(ns.getScriptRam('hack.js'), ns.getScriptRam('grow.js'), ns.getScriptRam('weaken.js'))
     const freeServers: FreeServer[] = serversCanRun.map((s) => {
         var freeRam = s.maxRam - s.ramUsed
@@ -140,7 +133,7 @@ const hackGrowWeaken = async (ns: NS, servers: Server[]) => {
     var processes = getProcesses(ns)
 
     // Only work on servers that aren't being worked on currently
-    const serversToWorkOn = allServers.filter((x) => !processes.some((y) => y.args.some((z) => z == x.hostname)))
+    const serversToWorkOn = servers.filter((x) => !processes.some((y) => y.args.some((z) => z == x.hostname)))
     // Can weaken and grow
     const serversToWeakenAndGrow = serversToWorkOn.filter((x) => x.hasAdminRights && x.moneyMax)
     // Can also hack
@@ -179,7 +172,7 @@ const hackGrowWeaken = async (ns: NS, servers: Server[]) => {
     }
 }
 
-const buyServer = async (ns: NS, servers: Server[]) => {
+const buyServer = async (ns: NS) => {
     const purchaseLimit = ns.getPurchasedServerLimit()
     const purchasedServers = servers.filter((x) => x.purchasedByPlayer && x.hostname != 'home')
 
@@ -200,17 +193,21 @@ const buyServer = async (ns: NS, servers: Server[]) => {
     }
 }
 
+let player: Player
+let servers: Server[]
 const mainLoopWork = async (ns: NS) => {
-    var servers = getServers(ns)
+    // Set
+    player = ns.getPlayer()
+    servers = getServers(ns)
 
     // Root servers and update them with the hacking script
-    await rootServers(ns, servers)
+    await rootServers(ns)
 
     // Hack / Grow / Weaken
-    await hackGrowWeaken(ns, servers)
+    await hackGrowWeaken(ns)
 
     // Buy new servers
-    await buyServer(ns, servers)
+    await buyServer(ns)
 }
 
 export async function main(ns: NS) {
