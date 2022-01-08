@@ -1,4 +1,4 @@
-import { NS } from 'bitburner'
+import { NS } from "bitburner"
 
 interface Column {
     label: string
@@ -21,21 +21,42 @@ function isNumeric(value: any): value is number {
     return !isNaN(parseFloat(value)) && isFinite(value)
 }
 
+function formatDuration(duration: number): string {
+    const breakdown = [
+        [86400000, 'd'],
+        [3600000, 'h'],
+        [60000, 'm'],
+        [1000, 's'],
+    ] as const
+    let out = ''
+    for (const [div, label] of breakdown) {
+        const value = Math.floor(duration / div)
+        duration %= div
+        if (value || out) {
+            out += `${value}${label} `
+        }
+    }
+    if (!out) {
+        out = '0s'
+    }
+    return out.trim()
+}
+
 function generateFormatter(ns: NS, format: Format): Column['formatter'] {
     if (typeof format === 'function') {
         return format
     }
     switch (format) {
         case 'string':
-            return (f) => '' + f
+            return f => '' + f
         case 'ram':
-            return (f) => fram(ns, f)
+            return f => ns.nFormat(f * 1024 ** 3, '0ib').toString()
         case 'money':
-            return (f) => ns.nFormat(f, '$0.00a').toString()
+            return f => ns.nFormat(f, '$0.00a').toString()
         case 'percentage':
-            return (f) => (f * 100).toFixed(2) + '%'
+            return f => (f * 100).toFixed(2) + '%'
         case 'time':
-            return (f) => ns.tFormat(f)
+            return formatDuration
     }
 }
 
@@ -57,12 +78,14 @@ export class Table {
     private title?: string
     private columns: Column[]
     private rows: any[][]
+    private footerRows: any[][]
 
     constructor(ns: NS, title?: string) {
         this.ns = ns
         this.title = title
         this.columns = []
         this.rows = []
+        this.footerRows = []
     }
 
     public addColumn(label: string, opts?: Partial<ColumnOptions>) {
@@ -71,7 +94,7 @@ export class Table {
             format: 'string',
             ...opts,
         }
-        const { align, format } = fullOpts
+        const {align, format} = fullOpts
 
         this.columns.push({
             label,
@@ -87,11 +110,18 @@ export class Table {
         this.rows.push(items)
     }
 
+    public addFooterRow(...items: any[]) {
+        if (items.length != this.columns.length) {
+            this.ns.tprint('WARNING: mismatched columns')
+        }
+        this.footerRows.push(items)
+    }
+
     private getWidths(): number[] {
-        let widths = this.columns.map((c) => c.label.length)
+        let widths = this.columns.map(c => c.label.length)
         for (const index in this.columns) {
             const column = this.columns[index]
-            for (const row of this.rows) {
+            for (const row of this.rows.concat(this.footerRows)) {
                 const formatted = column.formatter(row[index])
                 widths[index] = Math.max(formatted.length, widths[index])
             }
@@ -115,24 +145,54 @@ export class Table {
     }
 
     public render(): string {
+        const theme = {
+            '-': '\u2500',
+            '|': '\u2502',
+            v: '\u252c',
+            '+': '\u253c',
+            '^': '\u2534',
+        }
+
         const widths = this.getWidths()
-        const columnJoin = ' | '
-        const totalWidth = widths.reduce((t, w) => t + w, 0) + columnJoin.length * (widths.length - 1)
+        const columnJoin = ' ' + theme['|'] + ' '
+        const lineChar = theme['-']
         this.doAlignment()
 
         let out = ''
+
+        const doLine = (char: 'v' | '+' | '^') => {
+            return widths.map(w => lineChar.repeat(w)).join(theme['-'] + theme[char] + theme['-']) + '\n'
+        }
+
         if (this.title) {
             out += this.title + '\n'
         }
-        out += '-'.repeat(totalWidth) + '\n'
-        out += this.columns.map((c, i) => alignTruncate(c.label, widths[i], this.columns[i].align)).join(columnJoin) + '\n'
-        out += '-'.repeat(totalWidth) + '\n'
+        out += doLine('v')
+        out +=
+            this.columns.map((c, i) => alignTruncate(c.label, widths[i], this.columns[i].align)).join(columnJoin) + '\n'
+        out += doLine('+')
         for (const row of this.rows) {
-            out += row.map((c, i) => alignTruncate(this.columns[i].formatter(c), widths[i], this.columns[i].align)).join(columnJoin) + '\n'
+            out +=
+                row
+                    .map((c, i) => alignTruncate(this.columns[i].formatter(c), widths[i], this.columns[i].align))
+                    .join(columnJoin) + '\n'
         }
-        out += '-'.repeat(totalWidth) + '\n'
+        if (this.footerRows.length) {
+            out += doLine('+')
+            for (const row of this.footerRows) {
+                out +=
+                    row
+                        .map((c, i) => alignTruncate(this.columns[i].formatter(c), widths[i], this.columns[i].align))
+                        .join(columnJoin) + '\n'
+            }
+        }
+        out += doLine('^')
 
         return out
+    }
+
+    public print(): void {
+        this.ns.tprintf('%s', this.render())
     }
 
     public sortBy(key: string | number) {

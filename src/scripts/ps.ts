@@ -1,6 +1,8 @@
 import { fram, Table } from './utils/table'
 import { NS } from './bitburner'
 import { getProcesses, getServers } from './utils/get-servers'
+import { getServersCanRun } from 'main-loop-support'
+import {allReservedThreadCount} from "./batch-hacking";
 
 export async function main(ns: NS) {
     const hacking = ns.getPlayer().hacking
@@ -62,8 +64,12 @@ export async function main(ns: NS) {
     table.sortBy('Can hack')
     ns.tprint('\n' + table.render())
 
-    const serversCanRun = allServers.filter((s) => s.hasAdminRights && s.maxRam)
-    const maxRam = serversCanRun.reduce((r, s) => r + s.maxRam, 0)
-    const usedRam = serversCanRun.reduce((r, s) => r + s.ramUsed, 0)
+    const serversCanRun = getServersCanRun(allServers)
+    const maxRam = serversCanRun.reduce((r, s) => r + s.server.maxRam, 0)
+    const usedRam = serversCanRun.reduce((r, s) => r + s.server.ramUsed, 0)
     ns.tprintf('Used %s of %s %0.2f%%', fram(ns, usedRam), fram(ns, maxRam), (usedRam / maxRam) * 100)
+    const maxThreads = serversCanRun.reduce((r, s) => r + s.maxThreads, 0)
+    const reservedThreads = allReservedThreadCount()
+    const usedThreads = serversCanRun.reduce((r, s) => r + s.usedThreads, 0) + reservedThreads
+    ns.tprintf('Used %s (%s) of %s %0.2f%%', usedThreads, reservedThreads, maxThreads, (usedThreads / maxThreads) * 100)
 }
