@@ -73,12 +73,23 @@ function alignTruncate(value: string, width: number, align: Column['align']): st
     }
 }
 
+const rowItemToCellRows = (item: any): any[] => {
+    // If it's already an array, leave as is
+    if (Array.isArray(item)) return item
+    // If it's a string, break it into lines
+    if (typeof item === 'string') return item.split('\n')
+    // Otherwise, just return a single item array
+    return [item]
+}
+
+type Row = any[][]
+
 export class Table {
     private ns: NS
     private title?: string
     private columns: Column[]
-    private rows: any[][]
-    private footerRows: any[][]
+    private rows: Row[]
+    private footerRows: Row[]
 
     constructor(ns: NS, title?: string) {
         this.ns = ns
@@ -107,14 +118,14 @@ export class Table {
         if (items.length != this.columns.length) {
             this.ns.tprint('WARNING: mismatched columns')
         }
-        this.rows.push(items)
+        this.rows.push(items.map(x => rowItemToCellRows(x)))
     }
 
     public addFooterRow(...items: any[]) {
         if (items.length != this.columns.length) {
             this.ns.tprint('WARNING: mismatched columns')
         }
-        this.footerRows.push(items)
+        this.footerRows.push(items.map(x => rowItemToCellRows(x)))
     }
 
     private getWidths(): number[] {
@@ -122,8 +133,8 @@ export class Table {
         for (const index in this.columns) {
             const column = this.columns[index]
             for (const row of this.rows.concat(this.footerRows)) {
-                const formatted = column.formatter(row[index])
-                widths[index] = Math.max(formatted.length, widths[index])
+                const formattedCellItems = row[index].map(x => column.formatter(x))
+                widths[index] = Math.max(widths[index], ...formattedCellItems.map(x => x.length))
             }
         }
         return widths
@@ -137,7 +148,7 @@ export class Table {
             }
             column.align = 'right'
             for (const row of this.rows) {
-                if (!isNumeric(row[index])) {
+                if (!isNumeric(row[index][0])) {
                     column.align = 'left'
                 }
             }
@@ -171,23 +182,27 @@ export class Table {
         out +=
             this.columns.map((c, i) => alignTruncate(c.label, widths[i], this.columns[i].align)).join(columnJoin) + '\n'
         out += doLine('+')
-        for (const row of this.rows) {
-            out +=
-                row
-                    .map((c, i) => alignTruncate(this.columns[i].formatter(c), widths[i], this.columns[i].align))
-                    .join(columnJoin) + '\n'
-        }
+        out += this.renderRows(this.rows, widths, columnJoin)
         if (this.footerRows.length) {
             out += doLine('+')
-            for (const row of this.footerRows) {
-                out +=
-                    row
-                        .map((c, i) => alignTruncate(this.columns[i].formatter(c), widths[i], this.columns[i].align))
-                        .join(columnJoin) + '\n'
-            }
+            out += this.renderRows(this.footerRows, widths, columnJoin)
         }
         out += doLine('^')
 
+        return out
+    }
+
+    private renderRows(rows: Row[], widths: number[], columnJoin: string) : string {
+        let out = ""
+        for (const row of rows) {
+            const maxCellRows = Math.max(...row.map(x => x.length))
+            for (let cellRowNum = 0; cellRowNum < maxCellRows; cellRowNum++) {
+                out += row.map((c, i) => {
+                    const cellRowValue = c[cellRowNum] ?? ''
+                    return alignTruncate(this.columns[i].formatter(cellRowValue), widths[i], this.columns[i].align)
+                }).join(columnJoin) + '\n'
+            }
+        }
         return out
     }
 
@@ -221,9 +236,9 @@ export class Table {
 
         this.rows.sort((a, b) => {
             if (typeof a[index] === 'string') {
-                return a[index].localeCompare(b[index])
+                return a[index][0].localeCompare(b[index][0])
             }
-            return a[index] - b[index]
+            return a[index][0] - b[index][0]
         })
 
         if (reverse) {

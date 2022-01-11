@@ -1,47 +1,54 @@
-import { NS, Server } from './bitburner'
+import {NS, Player, Server} from './bitburner'
 import { purchaseServer } from './utils/purchase-server'
 import { rootServer } from './utils/root-server'
+import {ServerDetails} from "./utils/get-servers";
 
-export const PurchaseServerRam = 1048576
-export const HomeRamReservation = 32
+export const HomeRamReservation = 64
 
-export const rootServers = async (ns: NS, servers: Server[]) => {
+export const rootServers = async (ns: NS, servers: ServerDetails[]) => {
     for (const serverInfo of servers) {
-        const hostname = serverInfo.hostname
-        await rootServer(ns, hostname)
+        await rootServer(ns, serverInfo.Server, serverInfo.Path)
     }
 }
 
 export interface ServerCanRun {
     server: Server,
-    hostname: string
-    maxThreads: number
-    usedThreads: number
+    hostname: string,
+    maxThreads: number,
     freeThreads: number
 }
 
-export const getServersCanRun = (servers: Server[], ramCost: number = 1.75): ServerCanRun[] => {
+const HACKING_SCRIPTS = ['hack.js', 'grow.js', 'weaken.js']
+export const getServersCanRun = (ns: NS, servers: Server[], ramCost: number = 1.75): ServerCanRun[] => {
     return servers
         .filter((s) => s.hasAdminRights && s.maxRam)
         .map((s) => {
             let maxRam = s.maxRam
-            if (s.hostname == 'home') maxRam -= HomeRamReservation
-            var freeRam = maxRam - s.ramUsed
-            const maxThreads = Math.floor(maxRam / ramCost)
-            const freeThreads = freeRam > 0 ? Math.floor(freeRam / ramCost) : 0
-            const usedThreads = maxThreads - freeThreads
+            let usedRam = s.ramUsed
+            if (s.hostname == 'home') {
+                // If this is the home machine... we want to take off the ram reservation BUT we also want to remove
+                // the processes that are running in that reservation from the used ram
+                maxRam -= HomeRamReservation
+                const processes = ns.ps(s.hostname)
+                for (const ps of processes) {
+                    if (!HACKING_SCRIPTS.some(x => x == ps.filename)) usedRam -= ns.getScriptRam(ps.filename, 'home')
+                }
+            }
+
+            let freeRam = maxRam - usedRam
             return {
                 server: s,
                 hostname: s.hostname,
-                maxThreads: maxThreads,
-                usedThreads: usedThreads,
-                freeThreads: freeThreads,
+                maxThreads: Math.floor(maxRam / ramCost),
+                freeThreads: Math.floor(freeRam / ramCost)
             }
         }, [])
 }
 
-export const freeThreadCount = (freeServers: ServerCanRun[]) => {
-    return freeServers.reduce((p, r) => p + r.freeThreads, 0)
+export const freeThreadCount = (ns: NS, freeServers: ServerCanRun[]) => {
+    return freeServers.reduce((p, r) => {
+       return p + r.freeThreads
+    }, 0)
 }
 
 export interface ThreadCounts {
@@ -109,14 +116,35 @@ export const growThreadMaths = (
     return { weaken: wantedWeaken, grow: wantedGrow, hack: 0 }
 }
 
+const ServerPurchases: {ram:number; broken:boolean}[] = [
+    {ram: 2048, broken: true},
+    {ram: 16384, broken: true},
+    {ram: 131072, broken: true},
+    {ram: 1048576, broken: true}
+]
+
 export const buyServer = async (ns: NS, servers: Server[]) => {
     const purchaseLimit = ns.getPurchasedServerLimit()
     const purchasedServers = servers.filter((x) => x.purchasedByPlayer && x.hostname != 'home')
+    const moolah = ns.getServerMoneyAvailable('home')
+
+    // If we restart the script, we don't want to start replacing server because we don't have much money
+    const maxExistingRam = Math.max(...purchasedServers.map(x=> x.maxRam))
+
+    // Break the seal on buying - get the lowest that hasn't been broken
+    for (const serverPurchase of ServerPurchases) {
+        if (serverPurchase.broken) continue
+
+        const price = ns.getPurchasedServerCost(serverPurchase.ram)
+        serverPurchase.broken = moolah > price * 3 || serverPurchase.ram <= maxExistingRam
+    }
+
+    const ramToBuy = Math.max(...ServerPurchases.filter(x => x.broken).map(x => x.ram))
 
     // Buy new servers while we have enough money AND we haven't reached the limit
-    if (ns.getServerMoneyAvailable('home') > ns.getPurchasedServerCost(PurchaseServerRam)) {
+    if (ns.getServerMoneyAvailable('home') > ns.getPurchasedServerCost(ramToBuy)) {
         if (purchasedServers.length == purchaseLimit) {
-            const wrongRamServers = purchasedServers.filter((x) => x.maxRam != PurchaseServerRam)
+            const wrongRamServers = purchasedServers.filter((x) => x.maxRam != ramToBuy)
             // Don't try and buy or kill if all the servers are the right size
             if (wrongRamServers.length == 0) return
 
@@ -126,6 +154,6 @@ export const buyServer = async (ns: NS, servers: Server[]) => {
             ns.deleteServer(serverToKill)
         }
         // Purchase the server
-        await purchaseServer(ns, PurchaseServerRam)
+        await purchaseServer(ns, ramToBuy)
     }
 }

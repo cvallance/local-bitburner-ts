@@ -1,6 +1,6 @@
 import { NS, ProcessInfo, Server } from 'bitburner'
 
-interface ServerDetails {
+export interface ServerDetails {
     Path: string[]
     Server: Server
 }
